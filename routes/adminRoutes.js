@@ -57,4 +57,27 @@ router.put("/:id/status", protect, async (req, res) => {
   }
 });
 
+
+
+router.delete("/:id", protect, superAdminOnly, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.params.id);
+
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    if (admin.role === "superadmin") {
+      return res.status(403).json({ message: "Cannot delete superadmin" });
+    }
+
+    await admin.deleteOne();
+
+    res.json({ message: "Admin deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 export default router;
+
