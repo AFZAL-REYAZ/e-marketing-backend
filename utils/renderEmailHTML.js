@@ -1,13 +1,5 @@
 export const renderEmailHTML = (blocks, email, broadcastId) => {
-  let html = `
-    <!-- Open tracking pixel -->
-    <img
-      src="https://e-marketing.ipcnews.com/api/track/open/${broadcastId}?t=${Date.now()}"
-      width="1"
-      height="1"
-      style="display:none"
-    />
-  `;
+  let html = ``;
 
   for (const block of blocks) {
     switch (block.type) {
@@ -23,9 +15,11 @@ export const renderEmailHTML = (blocks, email, broadcastId) => {
         html += `
           <p>
             <a
-              href="https://e-marketing.ipcnews.com/api/track/click/${broadcastId}?url=${encodeURIComponent(
+              href="https://e-marketing-backend.onrender.com/api/track/click/${broadcastId}?url=${encodeURIComponent(
                 block.url
               )}"
+              target="_blank"
+              rel="noopener noreferrer"
               style="
                 display:inline-block;
                 padding:12px 20px;
@@ -48,15 +42,29 @@ export const renderEmailHTML = (blocks, email, broadcastId) => {
     }
   }
 
-  // ✅ Unsubscribe (MANDATORY)
+  // ✅ Unsubscribe
   html += `
     <hr />
     <p style="font-size:12px;color:#666;">
       If you don’t want to receive these emails,
-      <a href="https://e-marketing.ipcnews.com/api/unsubscribe?email={{email}}&broadcastId={{broadcastId}}">
+      <a
+        href="https://e-marketing-backend.onrender.com/api/unsubscribe?email=${encodeURIComponent(
+          email
+        )}&broadcastId=${broadcastId}"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
         Unsubscribe
       </a>
     </p>
+
+    <!-- Open tracking pixel (BEST POSITION) -->
+    <img
+      src="https://e-marketing-backend.onrender.com/api/track/open/${broadcastId}?t=${Date.now()}"
+      width="1"
+      height="1"
+      style="display:none"
+    />
   `;
 
   return html;

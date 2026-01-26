@@ -10,7 +10,6 @@ export const trackOpen = async (req, res) => {
       $inc: { "stats.opened": 1 },
     });
 
-    // return 1x1 transparent pixel
     const pixel = Buffer.from(
       "R0lGODlhAQABAIAAAP///////yH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==",
       "base64"
@@ -18,29 +17,30 @@ export const trackOpen = async (req, res) => {
 
     res.set("Content-Type", "image/gif");
     res.send(pixel);
-  } catch (error) {
-    res.status(200).end(); // never break email loading
+  } catch {
+    res.status(200).end();
   }
 };
 
 /* ================= CLICK TRACK ================= */
-
 export const trackClick = async (req, res) => {
   try {
     const { broadcastId } = req.params;
     const { url } = req.query;
 
-    if (!url) return res.status(400).send("Invalid URL");
+    if (!url) {
+      return res.status(400).send("Invalid URL");
+    }
 
     await Broadcast.findByIdAndUpdate(broadcastId, {
-      $inc: { 
-        "stats.clicked": 1,
-        "stats.opened": 1,
-    },
+      $inc: { "stats.clicked": 1 },
     });
 
-    res.redirect(url);
+    const decodedUrl = decodeURIComponent(url);
+
+    return res.redirect(302, decodedUrl);
   } catch (error) {
-    res.status(500).send("Tracking error");
+    console.error("Click tracking error:", error);
+    return res.status(500).send("Tracking error");
   }
 };
