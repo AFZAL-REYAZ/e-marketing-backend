@@ -2,7 +2,7 @@ export const renderEmailHTML = (blocks, email, broadcastId) => {
   let html = `
     <!-- Open tracking pixel -->
     <img
-      src="http://localhost:5000/api/track/open/${broadcastId}?t=${Date.now()}"
+      src="https://e-marketing.ipcnews.com/api/track/open/${broadcastId}?t=${Date.now()}"
       width="1"
       height="1"
       style="display:none"
@@ -23,7 +23,7 @@ export const renderEmailHTML = (blocks, email, broadcastId) => {
         html += `
           <p>
             <a
-              href="http://localhost:5000/api/track/click/${broadcastId}?url=${encodeURIComponent(
+              href="https://e-marketing.ipcnews.com/api/track/click/${broadcastId}?url=${encodeURIComponent(
                 block.url
               )}"
               style="
@@ -53,7 +53,7 @@ export const renderEmailHTML = (blocks, email, broadcastId) => {
     <hr />
     <p style="font-size:12px;color:#666;">
       If you don’t want to receive these emails,
-      <a href="http://localhost:5000/api/unsubscribe?email={{email}}&broadcastId={{broadcastId}}">
+      <a href="https://e-marketing.ipcnews.com/api/unsubscribe?email={{email}}&broadcastId={{broadcastId}}">
         Unsubscribe
       </a>
     </p>
