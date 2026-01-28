@@ -27,40 +27,57 @@ export const getEmailHistory = async (req, res) => {
 
 export const sendBulkEmail = async (req, res) => {
   try {
-    const { emails, templateId, blocks, scheduledAt } = req.body;
+    const { emails, templateId, blocks, scheduledAt, subject: manualSubject } = req.body;
 
-    // ... (Validation and Email Array logic remains same)
+    // 1. Basic Validation
+    if (!emails || (!templateId && !blocks)) {
+      return res.status(400).json({ message: "Invalid request" });
+    }
 
-    /* ================= SCHEDULING LOGIC ================= */
+    const emailArray = emails.split(/[\n,]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
+
+    /* ================= LOAD TEMPLATE OR BLOCKS ================= */
+    let template = null;
+    let templateBlocks = blocks || [];
+    let finalSubject = manualSubject || "No Subject";
+
+    if (templateId) {
+      template = await EmailTemplate.findById(templateId);
+      if (!template) return res.status(404).json({ message: "Template not found" });
+      
+      templateBlocks = template.blocks;
+      finalSubject = template.subject;
+    }
+
+    /* ================= SCHEDULING ================= */
     let isScheduled = false;
     let scheduledDate = null;
 
     if (scheduledAt) {
       scheduledDate = new Date(scheduledAt);
-      const now = new Date();
-
-      // If the date is valid, TRUST the user and schedule it.
-      // We only skip scheduling if the date is invalid.
+      // 🔥 Safety: Check if date is actually valid before calling toISOString()
       if (!isNaN(scheduledDate.getTime())) {
-        isScheduled = true;
+        const now = new Date();
+        // Only schedule if it's at least 1 minute in the future
+        if (scheduledDate > new Date(now.getTime() + 60000)) {
+          isScheduled = true;
+        }
       }
     }
 
     /* ================= CREATE BROADCAST ================= */
     const broadcast = await Broadcast.create({
-      title: template?.name || "Email Campaign",
-      subject: subject || template?.subject || "Campaign",
+      title: template?.name || "Manual Campaign",
+      subject: finalSubject, // 🔥 Fix: Use the safe variable
       recipients: emailArray,
       sentBy: req.adminId,
       blocks: templateBlocks,
       scheduledAt: isScheduled ? scheduledDate : null,
-      status: isScheduled ? "scheduled" : "sending", // 🔥 Correct status
+      status: isScheduled ? "scheduled" : "sending",
       stats: { sent: 0 },
     });
 
-    /* ================= STOP HERE IF SCHEDULED ================= */
     if (isScheduled) {
-      console.log(`✅ Campaign ${broadcast._id} locked in for ${scheduledDate}`);
       return res.json({
         message: "Campaign scheduled successfully",
         broadcastId: broadcast._id,
@@ -68,18 +85,19 @@ export const sendBulkEmail = async (req, res) => {
       });
     }
 
-    /* ================= IMMEDIATE SEND ONLY ================= */
-    // This code ONLY runs if isScheduled was false.
+    /* ================= IMMEDIATE SEND ================= */
     const resend = new Resend(process.env.RESEND_API_KEY);
 
     for (const email of emailArray) {
       const html = renderEmailHTML(templateBlocks, email, broadcast._id);
+
       await resend.emails.send({
         from: "ThePDFZone <noreply@thepdfzone.com>",
         to: email,
-        subject: broadcast.subject,
+        subject: finalSubject, // 🔥 Fix: Use finalSubject instead of template.subject
         html,
       });
+
       await new Promise((r) => setTimeout(r, 1000));
     }
 
@@ -91,8 +109,8 @@ export const sendBulkEmail = async (req, res) => {
     return res.json({ message: "Campaign sent immediately" });
 
   } catch (error) {
-    console.error("Controller Error:", error);
-    res.status(500).json({ message: "Email processing failed" });
+    console.error("CRITICAL ERROR:", error); // This will show in Render logs
+    res.status(500).json({ message: "Server Error: " + error.message });
   }
 };
 
