@@ -13,6 +13,24 @@ const broadcastSchema = new mongoose.Schema(
       ref: "Admin",
     },
 
+    /* 🔥 EMAIL CONTENT (REQUIRED FOR SCHEDULING) */
+    blocks: {
+      type: Array,
+      default: [],
+    },
+
+    /* 🔥 SCHEDULING FIELDS */
+    scheduledAt: {
+      type: Date,
+      default: null,
+    },
+
+    status: {
+      type: String,
+      enum: ["draft", "scheduled", "sending", "sent"],
+      default: "draft",
+    },
+
     stats: {
       sent: { type: Number, default: 0 },
       delivered: { type: Number, default: 0 },

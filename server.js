@@ -11,6 +11,7 @@ import trackingRoutes from "./routes/trackingRoutes.js";
 import broadcastRoutes from "./routes/broadcastRoutes.js";
 import unsubscribeRoutes from "./routes/unsubscribeRoutes.js";
 import templateRoutes from "./routes/templateRoutes.js";
+import "./jobs/campaignScheduler.js";
 
 const app = express();
 

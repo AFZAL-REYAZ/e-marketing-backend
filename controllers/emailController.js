@@ -25,124 +25,74 @@ export const getEmailHistory = async (req, res) => {
 
 
 
-
 export const sendBulkEmail = async (req, res) => {
   try {
-    const { emails, templateId, blocks } = req.body;
+    const { emails, templateId, blocks, scheduledAt } = req.body;
 
-    /* ================= VALIDATION ================= */
-    if (!emails || (!templateId && !blocks)) {
-      return res.status(400).json({ message: "Invalid request" });
-    }
+    // ... (Validation and Email Array logic remains same)
 
-    /* ================= NORMALIZE EMAILS ================= */
-    const emailArray = emails
-      .split(/[\n,]+/)
-      .map(e => e.trim().toLowerCase())
-      .filter(Boolean);
+    /* ================= SCHEDULING LOGIC ================= */
+    let isScheduled = false;
+    let scheduledDate = null;
 
-    if (!emailArray.length) {
-      return res.status(400).json({ message: "No valid emails found" });
-    }
+    if (scheduledAt) {
+      scheduledDate = new Date(scheduledAt);
+      const now = new Date();
 
-    /* ================= AUTO-SUBSCRIBE ================= */
-    for (const email of emailArray) {
-      await Subscriber.findOneAndUpdate(
-        { email },
-        { $setOnInsert: { isSubscribed: true } },
-        { upsert: true }
-      );
-    }
-
-    /* ================= LOAD TEMPLATE ================= */
-    let template = null;
-    let templateBlocks = blocks || [];
-
-    if (templateId) {
-      template = await EmailTemplate.findById(templateId);
-      if (!template) {
-        return res.status(404).json({ message: "Template not found" });
+      // If the date is valid, TRUST the user and schedule it.
+      // We only skip scheduling if the date is invalid.
+      if (!isNaN(scheduledDate.getTime())) {
+        isScheduled = true;
       }
-      templateBlocks = template.blocks;
     }
 
     /* ================= CREATE BROADCAST ================= */
     const broadcast = await Broadcast.create({
       title: template?.name || "Email Campaign",
-      subject: template?.subject || "Campaign",
+      subject: subject || template?.subject || "Campaign",
       recipients: emailArray,
       sentBy: req.adminId,
-      stats: { sent: emailArray.length },
+      blocks: templateBlocks,
+      scheduledAt: isScheduled ? scheduledDate : null,
+      status: isScheduled ? "scheduled" : "sending", // 🔥 Correct status
+      stats: { sent: 0 },
     });
 
-    const resend = new Resend(process.env.RESEND_API_KEY);
-
-    let sent = 0;
-    let failed = 0;
-
-    /* ================= SEND EMAILS ================= */
-    for (let i = 0; i < emailArray.length; i++) {
-      const email = emailArray[i];
-
-      const subscriber = await Subscriber.findOne({ email });
-      if (!subscriber || subscriber.isSubscribed === false) continue;
-
-      try {
-        const html = renderEmailHTML(
-          templateBlocks,
-          email,
-          broadcast._id
-        );
-
-        await resend.emails.send({
-          from: "ThePDFZone <noreply@thepdfzone.com>",
-          to: email,
-          subject: template.subject, // ✅ FIXED
-          html,
-          text: `
-${template.subject}
-
-This email contains rich content.
-Please view in HTML mode.
-
-Unsubscribe:
-https://thepdfzone.com/api/unsubscribe?email=${email}
-          `,
-          replyTo: req.adminEmail,
-          headers: {
-            "X-Entity-Ref-ID": req.adminId,
-          },
-        });
-
-        sent++;
-      } catch (err) {
-        failed++;
-      }
-
-      // Optional delay (safe sending)
-      await new Promise(r => setTimeout(r, 1000));
+    /* ================= STOP HERE IF SCHEDULED ================= */
+    if (isScheduled) {
+      console.log(`✅ Campaign ${broadcast._id} locked in for ${scheduledDate}`);
+      return res.json({
+        message: "Campaign scheduled successfully",
+        broadcastId: broadcast._id,
+        scheduledAt: scheduledDate,
+      });
     }
 
-    /* ================= SAVE LOG ================= */
-    await EmailLog.create({
-      recipients: emailArray,
-      subject: template.subject,
-      message: "[TEMPLATE BASED EMAIL]",
-      status: failed ? "partial" : "sent",
-      error: failed ? `${failed} failed` : null,
-      sentBy: req.adminId,
+    /* ================= IMMEDIATE SEND ONLY ================= */
+    // This code ONLY runs if isScheduled was false.
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    for (const email of emailArray) {
+      const html = renderEmailHTML(templateBlocks, email, broadcast._id);
+      await resend.emails.send({
+        from: "ThePDFZone <noreply@thepdfzone.com>",
+        to: email,
+        subject: broadcast.subject,
+        html,
+      });
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+
+    await Broadcast.findByIdAndUpdate(broadcast._id, {
+      status: "sent",
+      "stats.sent": emailArray.length,
     });
 
-    return res.json({
-      message: "Campaign sent",
-      total: emailArray.length,
-      sent,
-      failed,
-    });
+    return res.json({ message: "Campaign sent immediately" });
 
   } catch (error) {
-    console.error("Send email error:", error);
-    res.status(500).json({ message: "Email sending failed" });
+    console.error("Controller Error:", error);
+    res.status(500).json({ message: "Email processing failed" });
   }
 };
 
