@@ -9,18 +9,17 @@ export const unsubscribe = async (req, res) => {
       return res.status(400).send("Invalid unsubscribe link");
     }
 
-    // ✅ prevent double unsubscribe
-    const subscriber = await Subscriber.findOneAndUpdate(
-      { email, subscribed: true },
-      {
-        subscribed: false,
-        unsubscribedAt: new Date(),
-      },
-      { new: true }
-    );
+    // find subscriber first
+    let subscriber = await Subscriber.findOne({ email });
 
-    // ✅ increment only ONCE per broadcast
-    if (subscriber && broadcastId) {
+    if (subscriber && subscriber.subscribed) {
+      subscriber.subscribed = false;
+      subscriber.unsubscribedAt = new Date();
+      await subscriber.save();
+    }
+
+    // ALWAYS increment if broadcast exists
+    if (broadcastId) {
       await Broadcast.findByIdAndUpdate(broadcastId, {
         $inc: { "stats.unsubscribed": 1 },
       });
@@ -35,3 +34,4 @@ export const unsubscribe = async (req, res) => {
     res.status(500).send("Something went wrong");
   }
 };
+
