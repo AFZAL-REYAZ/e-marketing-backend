@@ -22,25 +22,19 @@ export const trackOpen = async (req, res) => {
   }
 };
 
-/* ================= CLICK TRACK ================= */
 export const trackClick = async (req, res) => {
   try {
     const { broadcastId } = req.params;
     const { url } = req.query;
 
-    if (!url) {
-      return res.status(400).send("Invalid URL");
-    }
-
     await Broadcast.findByIdAndUpdate(broadcastId, {
       $inc: { "stats.clicked": 1 },
     });
 
-    const decodedUrl = decodeURIComponent(url);
-
-    return res.redirect(302, decodedUrl);
-  } catch (error) {
-    console.error("Click tracking error:", error);
-    return res.status(500).send("Tracking error");
+    return res.redirect(302, decodeURIComponent(url));
+  } catch {
+    res.status(500).send("Tracking error");
   }
 };
+
+
