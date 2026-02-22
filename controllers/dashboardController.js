@@ -1,5 +1,7 @@
 import Admin from "../models/Admin.js";
 import Broadcast from "../models/Broadcast.js";
+import mongoose from "mongoose";
+
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -125,6 +127,63 @@ export const getDashboardStats = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+export const getAdminDashboardStats = async (req, res) => {
+  try {
+    if (!req.adminId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const adminObjectId = new mongoose.Types.ObjectId(req.adminId);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const stats = await Broadcast.aggregate([
+      {
+        $match: {
+          sentBy: adminObjectId,
+        },
+      },
+      {
+        $project: {
+          recipientsCount: { $size: "$recipients" },
+          createdAt: 1,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalCampaigns: { $sum: 1 },
+          totalEmails: { $sum: "$recipientsCount" },
+
+          emailsToday: {
+            $sum: {
+              $cond: [
+                { $gte: ["$createdAt", today] },
+                "$recipientsCount",
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const s = stats[0] || {};
+
+    res.json({
+      totalCampaigns: s.totalCampaigns || 0,
+      totalEmails: s.totalEmails || 0,
+      emailsToday: s.emailsToday || 0,
+      failedEmails: 0,
+    });
+  } catch (error) {
+    console.error("Admin dashboard error:", error);
     res.status(500).json({ message: error.message });
   }
 };
