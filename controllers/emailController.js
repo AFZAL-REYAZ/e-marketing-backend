@@ -92,7 +92,7 @@ export const sendBulkEmail = async (req, res) => {
       const html = renderEmailHTML(templateBlocks, email, broadcast._id);
 
       await resend.emails.send({
-        from: "ThePDFZone <noreply@thepdfzone.com>",
+        from: "SoftwareBeatz <noreply@softwarebeatz.com>",
         to: email,
         subject: finalSubject, // 🔥 Fix: Use finalSubject instead of template.subject
         html,
