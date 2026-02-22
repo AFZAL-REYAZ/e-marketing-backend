@@ -32,7 +32,14 @@ export const getTemplates = async (req, res) => {
 
 export const getTemplateById = async (req, res) => {
   try {
-    const template = await EmailTemplate.findById(req.params.id);
+    let filter = { _id: req.params.id };
+
+    // If not superadmin → restrict to own templates
+    if (req.role !== "superadmin") {
+      filter.createdBy = req.adminId;
+    }
+
+    const template = await EmailTemplate.findOne(filter);
 
     if (!template) {
       return res.status(404).json({ message: "Template not found" });
